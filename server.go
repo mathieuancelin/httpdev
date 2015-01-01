@@ -26,6 +26,15 @@ func (h bytesHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
   w.Write(h)
 }
 
+type LoggableHandler struct {
+  underlying http.Handler
+}
+
+func (h LoggableHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+  log.Println(req.Method, req.RequestURI)
+  h.underlying.ServeHTTP(w, req)
+}
+
 func main() {
   flag.Parse()
   if (*help) {
@@ -50,7 +59,7 @@ func main() {
     switch mode := fi.Mode(); {
       case mode.IsDir():
         log.Println("Listening at", *address, ":", *port, "and serving directory", root)
-        fs := http.FileServer(http.Dir(root))
+        fs := LoggableHandler{http.FileServer(http.Dir(root))}
         http.Handle(*prefix, http.StripPrefix(*prefix, fs))
         log.Fatal(http.ListenAndServe(*address + ":" + *port, nil))
       case mode.IsRegular():
@@ -58,12 +67,12 @@ func main() {
           log.Fatal("Error reading file: ", err)
         } else {
           log.Println("Listening at", *address, ":", *port, "and serving file", root)
-          log.Fatal(http.ListenAndServe(*address + ":" + *port, bytesHandler(content)))
+          log.Fatal(http.ListenAndServe(*address + ":" + *port, LoggableHandler{bytesHandler(content)}))
         }
       }
   } else {
     log.Println("Listening at", *address, ":", *port, "and serving some content")
-    log.Fatal(http.ListenAndServe(*address + ":" + *port, bytesHandler(root)))
+    log.Fatal(http.ListenAndServe(*address + ":" + *port, LoggableHandler{bytesHandler(root)}))
   }
   //fs := http.FileServer(http.Dir(root))
   //http.Handle(*prefix, http.StripPrefix(*prefix, fs))
