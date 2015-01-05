@@ -20,6 +20,24 @@ var (
 
 type bytesHandler []byte
 
+type FakeResponseWriter struct {
+  underlying http.ResponseWriter
+  statusCode int
+}
+
+func (w *FakeResponseWriter) Header() http.Header {
+  return w.underlying.Header()
+}
+
+func (w *FakeResponseWriter) Write(bytes []byte) (int, error) {
+  return w.underlying.Write(bytes)
+}
+
+func (w *FakeResponseWriter) WriteHeader(code int) {
+  w.statusCode = code
+  w.underlying.WriteHeader(code) 
+}
+
 func (h bytesHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
   w.Header().Set("Content-Type", "text/html; charset=utf-8")
   w.WriteHeader(*status)
@@ -31,8 +49,9 @@ type LoggableHandler struct {
 }
 
 func (h LoggableHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-  log.Println(req.Method, req.RequestURI)
-  h.underlying.ServeHTTP(w, req)
+  fakeW := &FakeResponseWriter{w, 200,}
+  h.underlying.ServeHTTP(fakeW, req)
+  log.Println("(", req.Method, ":", fakeW.statusCode, ")\t=>\t", req.RequestURI)
 }
 
 func main() {
